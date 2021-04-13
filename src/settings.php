@@ -19,7 +19,7 @@ return [
             'host' => 'localhost',
             'user' => 'root',
             'pass' => '',
-            'dbname' => 'slim',
+            'dbname' => 'absence',
             'driver' => 'mysql'
         ],
     ]
