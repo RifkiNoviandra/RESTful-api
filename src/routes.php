@@ -16,6 +16,7 @@ return function (App $app) {
     //     return $container->get('renderer')->render($response, 'index.phtml', $args);
     // });
 
+    // user
     $app->get("/user/login" , function(Request $request , Response $response){
 
         $info = $request->getParsedBody();
@@ -67,17 +68,9 @@ return function (App $app) {
 
     });
 
-
-    $app->get("/user", function (Request $request, Response $response){
-        $sql = "SELECT * FROM user";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute();
-        $result = $stmt->fetchAll();
-        return $response->withJson(["status" => "success", "data" => $result], 200);
-    });
-    
-    $app->get("/user/{id}", function (Request $request, Response $response, $args){
-        $id = $args["id"];
+    $app->post("/user/read", function (Request $request, Response $response){
+        $info = $request->getParsedBody();
+        $id = isset ($info['id']) ? $info['id']:'';
         $sql = "SELECT * FROM user WHERE user_id=:id";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([":id" => $id]);
@@ -96,8 +89,9 @@ return function (App $app) {
         }
     });
     
-    $app->get("/user/search/{param}", function (Request $request, Response $response, $args){
-        $keyword = $args["param"];
+    $app->post("/user/search/", function (Request $request, Response $response){
+        $info = $request->getParsedBody();
+        $keyword = isset ($info['param']) ? $info['param']:'';
         $sql = "SELECT * FROM user WHERE name LIKE '%$keyword%' OR handphone_number LIKE '%$keyword%' OR email LIKE '%$keyword%'";
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
@@ -158,7 +152,190 @@ return function (App $app) {
         }
     });
 
-    $app->get("/admin/login" , function(Request $request , Response $response){
+    $app->post("/user/attendance/", function (Request $request, Response $response){
+        $info = $request->getParsedBody();
+        $user_id = isset ($info['user_id']) ? $info['user_id']:'';
+        $date = isset ($info['date']) ? $info['date']:'';
+        $time = isset ($info['time']) ? $info['time']:'';
+        $location = isset ($info['location']) ? $info['location']:'';
+
+        $sql = "SELECT * FROM setting";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $data = $stmt->fetchAll();
+        $input_time = strtotime($time);
+        $set_time = strtotime($data[0]['closed_time']);
+        $open_time = strtotime($data[0]['open_time']);
+        // $diff = $set_time - $input_time ;
+        // $diff = round(abs($diff)/60,2);
+
+        if(empty($info['user_id']) || empty($info['date']) || empty($info['time']) || empty($info['location'])){
+            return $response->withJson(
+                [
+                    "status" => "failed", 
+                    "massage" => "Please Fill All Required Field",
+                    "data" => "0"
+                ],200
+            );
+        }
+        
+        if($input_time >= $open_time){
+
+            if ($input_time <= $set_time ) {
+                $status = "hadir" ;
+            }
+            elseif($input_time > $set_time){
+                $status = "terlambat";
+            }
+
+        $insert = "INSERT INTO attendance (user_id , date , time , location , status) VALUES (:user_id , :date , :time , :location , :status)" ;
+        $query = $this->db->prepare($insert);
+        $data = [
+            ":user_id" => $user_id ,
+            ":date" => $date,
+            ":time" => $time,
+            ":location" => $location,
+            ":status" => $status
+        ];
+
+        if($query->execute($data))
+        return $response->withJson(
+            [
+                "status" => "success",
+                "message" => "Your Attendance Has Been Recorded",
+                 "data" => $data 
+            ], 200
+        );
+     
+        return $response->withJson(
+             [
+                 "status" => "failed", 
+                 "data" => "0"
+             ],200
+         );
+
+        }else{
+            return $response->withJson(
+                [
+                    "status" => "failed",
+                    "Message" => "attendance has not opened yet",
+                    "data" => "0"
+                ],200
+            );
+        }
+        
+    });
+
+    $app->post("/user/permittance/", function (Request $request, Response $response){
+        $info = $request->getParsedBody();
+        $user_id = isset ($info['user_id']) ? $info['user_id']:'';
+        $date = isset ($info['date']) ? $info['date']:'';
+        $time = isset ($info['time']) ? $info['time']:'';
+        $reason = isset ($info['reason']) ? $info['reason']:'';
+        $permit_time = isset ($info['permittance_time']) ? $info['permittance_time']:'';
+        $proof = isset ($info['proof']) ? $info['proof'] : '';
+
+        $sql = "SELECT * FROM user WHERE user_id = '$user_id'";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $fetch = $stmt->fetch();
+
+        if (empty($info['user_id']) || empty($info['date']) || empty($info['time']) || empty($info['reason']) || empty($info['permittance_time']) || empty($info['proof'])) {
+            return $response->withJson(
+                [
+                    "status" => "failed",
+                    "Message" => "Please Fill All Required Fields",
+                    "data" => "0"
+                ],200
+            );
+        }else{
+            $query = "INSERT INTO permittance(user_id,name,date,time,reason,permittance_time,proof) VALUES(:user_id , :name,:date , :time , :reason ,:permit_time,:proof)" ;
+            $input = $this->db->prepare($query);
+
+            $data = [
+                ":user_id" => $user_id,
+                ":name" => $fetch['name'],
+                ":time" => $time,
+                ":date" => $date,
+                ":reason" => $reason,
+                ":permit_time" => $permit_time,
+                ":proof" => $proof 
+            ];
+
+            if ($input->execute($data)) {
+                return $response->withJson(
+                    [
+                        "status" => "succes",
+                        "data" => $data
+                    ],200
+                );
+            } else{
+                return $response->withJson(
+                    [
+                        "status" => "failed",
+                        "Message" => "Please Fill All Required Fields",
+                        "data" => "0"
+                    ],200
+                );
+            }
+        }
+    });
+
+    $app->post("/user/report/" , function(Request $request , Response $response){
+        $info = $request->getParsedBody();
+        $user_id = isset ($info['user_id']) ? $info['user_id']:'';
+        $date = isset ($info['date']) ? $info['date']:'';
+        $new_knowledge = isset ($info['new_knowledge']) ? $info['new_knowledge']:'';
+        $photo = isset ($info['photo']) ? $info['photo']:'';
+
+        $sql = "SELECT * FROM user WHERE user_id = '$user_id'";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $data = $stmt->fetch();
+
+        if (empty($info['user_id']) || empty($info['date']) || empty($info['new_knowledge']) || empty($info['photo'])) {
+            return $response->withJson(
+                [
+                    "status" => "failed",
+                    "Message" => "Please Fill All Required Fields",
+                    "data" => "0"
+                ],200
+            );
+        }else{
+            $query = "INSERT INTO report(user_id,name,date,new_knowledge,photo) VALUES(:user_id , :name,:date ,:new_knowledge , :photo)" ;
+            $input = $this->db->prepare($query);
+
+            $data = [
+                ":user_id" => $user_id,
+                ":name" => $data['name'],
+                ":date" => $date,
+                ":new_knowledge" => $new_knowledge,
+                ":photo" => $photo 
+            ];
+
+            if ($input->execute($data)) {
+                return $response->withJson(
+                    [
+                        "status" => "succes",
+                        "data" => $data
+                    ],200
+                );
+            } else{
+                return $response->withJson(
+                    [
+                        "status" => "failed",
+                        "Message" => "Please Fill All Required Fields",
+                        "data" => "0"
+                    ],200
+                );
+            }
+        }
+
+    });
+    // enduser
+
+    // Admin
+    $app->post("/admin/login" , function(Request $request , Response $response){
 
         $info = $request->getParsedBody();
 
@@ -215,10 +392,56 @@ return function (App $app) {
                 );
             }
         }
+    });
 
+
+        //Get List
+
+    $app->get("/admin/school_list" , function(Request $request , Response $response){
+        $sql = "SELECT * FROM school";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->fetchAll();
+        return $response->withJson(["status" => "success", "data" => $result], 200);
     });
     
+    $app->get("/admin/user_list", function (Request $request, Response $response){
+        $sql = "SELECT * FROM user";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->fetchAll();
+        return $response->withJson(["status" => "success", "data" => $result], 200);
+    });
+
+    $app->get("/admin/attendance_list", function (Request $request, Response $response){
+        $sql = "SELECT * FROM attendance";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->fetchAll();
+        return $response->withJson(["status" => "success", "data" => $result], 200);
+    });
+
+    $app->get("/admin/permittance_list", function (Request $request, Response $response){
+        $sql = "SELECT * FROM permittance";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->fetchAll();
+        return $response->withJson(["status" => "success", "data" => $result], 200);
+    });
+
+    $app->get("/admin/report_list", function (Request $request, Response $response){
+        $sql = "SELECT * FROM report";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->fetchAll();
+        return $response->withJson(["status" => "success", "data" => $result], 200);
+    });
     
+        //end Get List
+    
+    // endadmin
+
+
 //     $app->put("/siswa/{nis}", function (Request $request, Response $response, $args){
 //         $nis = $args["nis"];
 //         $info = $request->getParsedBody();
