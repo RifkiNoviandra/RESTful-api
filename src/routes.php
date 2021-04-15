@@ -395,6 +395,70 @@ return function (App $app) {
     });
 
 
+    $app->get("/admin/register/school" , function(Request $request , Response $response){
+        $request->getParsedBody();
+        $nspn = isset ($info['nspn']) ? $info['nspn']:'';
+        $name = isset ($info['name']) ? $info['name']:'';
+        $photo = isset ($info['photo']) ? $info['photo']:'';
+        $address = isset ($info['address']) ? $info['address']:'';
+        $principal = isset ($info['principal']) ? $info['principal']:'';
+        $fax = isset ($info['fax']) ? $info['fax']:'';
+
+        if(empty($info['nspn']) || empty($info['name']) || empty($info['photo']) || empty($info['address']) || empty($info['principal']) || empty($info['fax'])){
+            return $response->withJson(
+                [
+                    "status" => "field_empty",
+                    "message" => "Please Fill All Required Field",
+                    "data" => "0"
+                ],200
+            );
+        }else{
+            $sql = "SELECT * FROM school WHERE nspn=:nspn";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute();
+            $data = $stmt->fetchAll();
+
+            if (count($data > 0)) {
+                return $response->withJson(
+                    [
+                        "status" => "failed",
+                        "message" => "School With NSPN : $nspn Is Already Added",
+                        "data" => "0"
+                    ],200
+                );
+            }else{
+                $query = "INSERT INTO school(nspn,name,photo,address,principal,fax) VALUES(:nspn,:name,:photo,:address,:principal,:fax)";
+                $insert = $this->db->prepare($query);
+
+                $inserted_data = [
+                    ":nspn" => $nspn,
+                    ":name" => $name,
+                    ":photo" => $photo,
+                    ":address" => $address,
+                    ":principal" => $principal,
+                    ":fax" => $fax
+                ];
+
+                if($insert->execute($data)){
+                    return $response->withJson(
+                        [
+                            "status" => "success",
+                            "data" => $inserted_data
+                        ],200
+                    );
+                }else{
+                    return $response->withJson(
+                        [
+                            "status" => "failed",
+                            "data" => "0"
+                        ],200
+                    );
+                }
+            }
+        }
+    });
+
+
         //Get List
 
     $app->get("/admin/school_list" , function(Request $request , Response $response){
