@@ -4,6 +4,7 @@ use Slim\App;
 use Slim\Http\Message;
 use Slim\Http\Request;
 use Slim\Http\Response;
+use Slim\Http\UploadedFile;
 
 return function (App $app) {
     $container = $app->getContainer();
@@ -17,7 +18,7 @@ return function (App $app) {
     // });
 
     // user
-    $app->get("/user/login" , function(Request $request , Response $response){
+    $app->post("/user/login" , function(Request $request , Response $response){
 
         $info = $request->getParsedBody();
 
@@ -68,9 +69,8 @@ return function (App $app) {
 
     });
 
-    $app->post("/user/read", function (Request $request, Response $response){
-        $info = $request->getParsedBody();
-        $id = isset ($info['id']) ? $info['id']:'';
+    $app->get("/user/read/{id}", function (Request $request, Response $response, $args){
+        $id = isset ($args['id']) ? $args['id']:'';
         $sql = "SELECT * FROM user WHERE user_id=:id";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([":id" => $id]);
@@ -89,9 +89,8 @@ return function (App $app) {
         }
     });
     
-    $app->post("/user/search/", function (Request $request, Response $response){
-        $info = $request->getParsedBody();
-        $keyword = isset ($info['param']) ? $info['param']:'';
+    $app->get("/user/search/{param}", function (Request $request, Response $response ,$args){
+        $keyword = isset ($args['param']) ? $args['param']:'';
         $sql = "SELECT * FROM user WHERE name LIKE '%$keyword%' OR handphone_number LIKE '%$keyword%' OR email LIKE '%$keyword%'";
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
@@ -150,6 +149,21 @@ return function (App $app) {
                 ],200
             );
         }
+    });
+
+    $app->delete("/user/delete/{id}", function (Request $request, Response $response, $args){
+        $id = $args["id"];
+        $sql = "DELETE FROM user WHERE user_id=:user_id";
+        $stmt = $this->db->prepare($sql);
+        
+        $data = [
+            ":user_id" => $id
+        ];
+    
+        if($stmt->execute($data))
+           return $response->withJson(["status" => "success", "data" => "1"], 200);
+        
+        return $response->withJson(["status" => "failed", "data" => "0"], 200);
     });
 
     $app->post("/user/attendance/", function (Request $request, Response $response){
@@ -506,38 +520,51 @@ return function (App $app) {
     // endadmin
 
 
-//     $app->put("/siswa/{nis}", function (Request $request, Response $response, $args){
-//         $nis = $args["nis"];
-//         $info = $request->getParsedBody();
-//         $sql = "UPDATE biodata SET nama=:nama, kelas=:kelas, absen=:absen , nomor=:absen WHERE nis=:nis";
-//         $stmt = $this->db->prepare($sql);
-//         $data = [
-//             ":nis" => $nis,
-//             ":nama" => $info["nama"],
-//             ":kelas" => $info["kelas"],
-//             ":absen" => $info["absen"],
-//             ":nomor" => $info["nomor"]
-//         ];
-    
-//         if($stmt->execute($data))
-//            return $response->withJson(["status" => "success", "data" => "1"], 200);
+    $app->put("/user/update/{id}", function (Request $request, Response $response, $args){
+        $id = $args["id"];
+        $info = $request->getParsedBody();
+        $sql = "SELECT * FROM user WHERE user_id=$id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $fetch = $stmt->fetchAll();
         
-//         return $response->withJson(["status" => "failed", "data" => "0"], 200);
-//     });
-    
-    
-//     $app->delete("/siswa/{nis}", function (Request $request, Response $response, $args){
-//         $nis = $args["nis"];
-//         $sql = "DELETE FROM biodata WHERE nis=:nis";
-//         $stmt = $this->db->prepare($sql);
+        if (count($fetch) < 1) {
+            return $response->withJson(
+                [
+                    "status" => "success",
+                    "message" => "No Data With User_id $id", 
+                    "data" => 0 
+                    ]
+                , 200);
+        }else{
+
+        $email = isset ($info['email']) ? $info['email']:$fetch[0]['email'];
+        $name = isset ($info['name']) ? $info['name']:$fetch[0]['name'];
+        $photo = isset ($info['photo']) ? $info['photo']:$fetch[0]['photo'];
+        $handphone_number = isset ($info['handphone_number']) ? $info['handphone_number']:$fetch[0]['handphone_number'];
+        $address = isset ($info['address']) ? $info['address']:$fetch[0]['address'];
+        $password = isset ($info['password']) ? $info['password']:$fetch[0]['password'];
+        $role = $fetch[0]['role'];                                                                                           
+
+        $query = "UPDATE user SET email=:email , name=:name , photo=:photo , handphone_number = :handphone_number , address=:address, password=:password  WHERE user_id=$id";
+        $update = $this->db->prepare($query);
         
-//         $data = [
-//             ":nis" => $nis
-//         ];
+        $data = [
+
+            ":email" => $email,
+            ":name" => $name,
+            ":photo" => $photo,
+            ":handphone_number" => $handphone_number,
+            ":address" => $address,
+            ":password" => $password,
+        ];
+
+        if ($update->execute($data)){
+            return $response->withJson(["status" => "success","id" => $id, "data" => $data,"role" => $role], 200);
+        }else{
+            return $response->withJson(["status" => "failed", "data" => "0"], 200);
+        }
+    }
+    });
     
-//         if($stmt->execute($data))
-//            return $response->withJson(["status" => "success", "data" => "1"], 200);
-        
-//         return $response->withJson(["status" => "failed", "data" => "0"], 200);
-//     });
 };
