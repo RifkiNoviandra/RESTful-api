@@ -22,5 +22,6 @@ return [
             'dbname' => 'absence',
             'driver' => 'mysql'
         ],
+        'upload_directory' => __DIR__.'../public/user_image'
     ]
 ];
